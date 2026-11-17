@@ -1,15 +1,16 @@
 name: ethio_edu_ai
-description: "100% Offline AI tutor for Ethiopian Class 9-12 students (PWA, Android & Windows)"
+description: "Offline AI Tutor for Ethiopian Grade 9-12 students"
 publish_to: 'none'
 version: 1.0.0+1
 
 environment:
-  sdk: '>=3.0.0 <4.0.0'
+  sdk: '>=3.10.7 <4.0.0'
 
 dependencies:
   flutter:
     sdk: flutter
   cupertino_icons: ^1.0.6
+  llamadart: ^0.19.11
 
 dev_dependencies:
   flutter_test:
@@ -18,7 +19,3 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
-
-  # የ AI ሞዴል ፋይሎችን ወይም የትምህርት መጽሐፍ ዳታዎችን እዚህ ጋር ማስገባት ይችላሉ
-  assets:
-    - assets/
