@@ -1,68 +1,99 @@
-name: Build Android APK Automatically
+name: Build Ethio Edu AI
 
 on:
   push:
-    branches: [ "main" ]
+    branches: ["main"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
 
 jobs:
   build-android:
+    name: Build Android APK
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout code
+      - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Set up Java
+      - name: Setup Java
         uses: actions/setup-java@v4
         with:
-          distribution: 'zulu'
-          java-version: '17'
+          distribution: zulu
+          java-version: "17"
 
-      - name: Set up Flutter
+      - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
-          channel: 'stable'
+          channel: stable
+          flutter-version: "3.50.0"
+          cache: true
 
-      - name: Install Flutter Dependencies
-        run: flutter pub get
-
-      - name: Create Android Platform Support
+      - name: Create Android Support
         run: flutter create . --platforms=android
 
-      - name: Build Android APK
+      - name: Enable Internet Permission
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          p = Path("android/app/src/main/AndroidManifest.xml")
+          s = p.read_text()
+          permission = '<uses-permission android:name="android.permission.INTERNET"/>'
+
+          if permission not in s:
+              pos = s.find("<application")
+              s = s[:pos] + "    " + permission + "\n    " + s[pos:]
+              p.write_text(s)
+          PY
+
+      - name: Install Dependencies
+        run: flutter pub get
+
+      - name: Build Release APK
         run: flutter build apk --release
 
-      - name: Upload APK Artifact
+      - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: Ethio-Edu-AI-APK
           path: build/app/outputs/flutter-apk/app-release.apk
 
-
   build-windows:
+    name: Build Windows EXE
     runs-on: windows-latest
+
     steps:
-      - name: Checkout code
+      - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Set up Flutter
+      - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
-          channel: 'stable'
+          channel: stable
+          flutter-version: "3.50.0"
+          cache: true
 
-      - name: Install Flutter Dependencies
-        run: flutter pub get
-
-      # የዊንዶውስ ዴስክቶፕ ድጋፍ በራስ-ሰር እንዲዋቀር ማድረግ
-      - name: Add Windows Support
+      - name: Create Windows Support
         run: flutter create . --platforms=windows
 
-      - name: Build Windows EXE
+      - name: Install Dependencies
+        run: flutter pub get
+
+      - name: Build Windows
         run: flutter build windows --release
 
-      - name: Upload Windows EXE Artifact
+      - name: Package Windows App
+        shell: pwsh
+        run: |
+          Compress-Archive `
+            -Path "build/windows/x64/runner/Release/*" `
+            -DestinationPath "Ethio-Edu-AI-Windows.zip" `
+            -Force
+
+      - name: Upload Windows App
         uses: actions/upload-artifact@v4
         with:
-          name: Ethio-Edu-AI-Windows-EXE
-          path: build/windows/x64/runner/Release/
-          
+          name: Ethio-Edu-AI-Windows
+          path: Ethio-Edu-AI-Windows.zip
