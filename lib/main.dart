@@ -30,7 +30,7 @@ class ChatScreen extends StatefulWidget {
 
 class _ChatScreenState extends State<ChatScreen> {
   final TextEditingController _controller = TextEditingController();
-  final List> _messages = [];
+  final List<dynamic> _messages = [];
   bool _isLoading = false;
   bool _isModelDownloaded = false;
   double _downloadProgress = 0.0;
