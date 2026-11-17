@@ -32,16 +32,14 @@ class _ChatScreenState extends State<ChatScreen> {
   final TextEditingController _controller = TextEditingController();
   final List> _messages = [];
   bool _isLoading = false;
-  bool _isModelDownloaded = false; // ሞዴሉ መውረዱን እና አለመውረዱን ለመቆጣጠር
+  bool _isModelDownloaded = false;
   double _downloadProgress = 0.0;
 
-  // 1. የ AI ሞዴሉን ከኢንተርኔት አፕ ውስጥ ሆኖ የማውረድ ሎጂክ (In-App Download)
   void _downloadAiModel() async {
     setState(() {
       _isLoading = true;
     });
 
-    // የማስመሰያ የዳውንሎድ ሂደት (Progress) - እዚህ ጋር ትክክለኛውን የ Dio/Http ማወረጃ ኮድ ማስገባት ይቻላል
     for (int i = 1; i <= 5; i++) {
       await Future.delayed(const Duration(seconds: 1));
       setState(() {
@@ -54,15 +52,15 @@ class _ChatScreenState extends State<ChatScreen> {
       _isModelDownloaded = true;
     });
 
+    if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
-        content: Text('የ Gemma AI ሞዴል በተሳካ ሁኔታ ወርዷል! አሁን ከመስመር ውጭ መጠቀም ይችላሉ።'),
+        content: Text('የ Gemma AI ሞዴል በተሳካ ሁኔታ ወርዷል!'),
         backgroundColor: Colors.green,
       ),
     );
   }
 
-  // 2. መልዕክት የመላክ እና የ AI ምላሽ ማግኛ ፈንክሽን
   Future<void> _sendMessage() async {
     final text = _controller.text.trim();
     if (text.isEmpty) return;
@@ -85,16 +83,16 @@ class _ChatScreenState extends State<ChatScreen> {
     _controller.clear();
 
     try {
-      // እዚህ ጋር በስልኩ ውስጥ ካለው ሞዴል ጋር የመነጋገር ሎጂክ ይገባል
       await Future.delayed(const Duration(seconds: 2)); 
       
       setState(() {
         _messages.add({
           "sender": "ai", 
-          "message": "ይህ ከኢትዮጵያ 9-12ኛ ክፍል መማሪያ መጽሐፍት የተሰጠ ከመስመር ውጭ (Offline) ምላሽ ነው..."
+          "message": "ይህ ከኢትዮጵያ 9-12ኛ ክፍል መማሪያ መጽሐፍት የተሰጠ ከመስመር ውጭ ምላሽ ነው..."
         });
       });
     } catch (e) {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('ስህተት ተፈጥሯል: $e'), backgroundColor: Colors.red),
       );
@@ -105,7 +103,6 @@ class _ChatScreenState extends State<ChatScreen> {
     }
   }
 
-  // 3. ማሻሻያ (Update) መፈተሻ ፈንክሽን
   void _checkForUpdate() {
     showDialog(
       context: context,
@@ -139,7 +136,6 @@ class _ChatScreenState extends State<ChatScreen> {
       ),
       body: Column(
         children: [
-          // ሞዴሉ ካልወረደ የማውረድ ማስጠንቀቂያ እና ባር ማሳየት
           if (!_isModelDownloaded)
             Container(
               color: Colors.amber[100],
@@ -147,7 +143,7 @@ class _ChatScreenState extends State<ChatScreen> {
               child: Column(
                 children: [
                   const Text(
-                    'የ AI ሞዴል (Gemma) በስልክዎ ላይ አልተገኘም። እባክዎ ከመስመር ውጭ ለመጠቀም አንዴ ያውርዱት።',
+                    'የ AI ሞዴል በስልክዎ ላይ አልተገኘም። እባክዎ ከመስመር ውጭ ለመጠቀም አንዴ ያውርዱት።',
                     textAlign: TextAlign.center,
                     style: TextStyle(fontWeight: FontWeight.bold),
                   ),
@@ -158,13 +154,12 @@ class _ChatScreenState extends State<ChatScreen> {
                     ElevatedButton.icon(
                       onPressed: _downloadAiModel,
                       icon: const Icon(Icons.download),
-                      label: const Text('የ AI ሞዴል አውርድ (Download)'),
+                      label: const Text('የ AI ሞዴል አውርድ'),
                     ),
                 ],
               ),
             ),
           
-          // የመልዕክቶች ማሳያ ዝርዝር
           Expanded(
             child: ListView.builder(
               padding: const EdgeInsets.all(12),
@@ -191,7 +186,6 @@ class _ChatScreenState extends State<ChatScreen> {
             ),
           ),
           
-          // የጽሁፍ መጻፊያ እና መላኪያ ክፍል
           Container(
             padding: const EdgeInsets.all(8),
             color: Colors.grey[100],
