@@ -1,24 +1,38 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:llamadart/llamadart.dart';
+
+const String modelUri =
+    'hf://unsloth/gemma-3-1b-it-GGUF/'
+    'gemma-3-1b-it-Q4_K_M.gguf';
 
 void main() {
-  runApp(const EthioEduAiApp());
+  WidgetsFlutterBinding.ensureInitialized();
+  runApp(const EthioEduAI());
 }
 
-class EthioEduAiApp extends StatelessWidget {
-  const EthioEduAiApp({super.key});
+class EthioEduAI extends StatelessWidget {
+  const EthioEduAI({super.key});
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Ethio Edu AI',
       debugShowCheckedModeBanner: false,
+      title: 'Ethio Edu AI',
       theme: ThemeData(
-        primarySwatch: Colors.blue,
+        colorSchemeSeed: Colors.blue,
         useMaterial3: true,
       ),
       home: const ChatScreen(),
     );
   }
+}
+
+class ChatMessage {
+  ChatMessage(this.text, this.isUser);
+
+  String text;
+  final bool isUser;
 }
 
 class ChatScreen extends StatefulWidget {
@@ -29,156 +43,186 @@ class ChatScreen extends StatefulWidget {
 }
 
 class _ChatScreenState extends State<ChatScreen> {
-  final TextEditingController _controller = TextEditingController();
-  final List<Map<String, String>> _messages = [];
-  bool _isLoading = false;
-  bool _isModelDownloaded = false;
-  double _downloadProgress = 0.0;
+  final LlamaEngine _engine = LlamaEngine(LlamaBackend());
+  final ModelDownloadCancelToken _cancelToken =
+      ModelDownloadCancelToken();
 
-  void _downloadAiModel() async {
-    setState(() {
-      _isLoading = true;
-    });
+  final TextEditingController _input = TextEditingController();
+  final List<ChatMessage> _messages = [];
 
-    for (int i = 1; i <= 5; i++) {
-      await Future.delayed(const Duration(seconds: 1));
-      setState(() {
-        _downloadProgress = i / 5;
-      });
-    }
+  ChatSession? _session;
 
-    setState(() {
-      _isLoading = false;
-      _isModelDownloaded = true;
-    });
+  String _status = 'AI Model በመዘጋጀት ላይ...';
+  double? _progress;
+  bool _generating = false;
 
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('የ Gemma AI ሞዴል በተሳካ ሁኔታ ወርዷል!'),
-        backgroundColor: Colors.green,
-      ),
-    );
+  @override
+  void initState() {
+    super.initState();
+    unawaited(_loadModel());
   }
 
-
-  Future<void> _sendMessage() async {
-    final text = _controller.text.trim();
-    if (text.isEmpty) return;
-
-    if (!_isModelDownloaded) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('እባክዎ መጀመሪያ የ AI ሞዴሉን ያውርዱ!'),
-          backgroundColor: Colors.orange,
-        ),
-      );
-      return;
-    }
-
+  Future<void> _loadModel() async {
     setState(() {
-      _messages.add({"sender": "user", "message": text});
-      _isLoading = true;
+      _status = 'Gemma AI Model በማውረድ ላይ...';
     });
 
-    _controller.clear();
-
     try {
-      await Future.delayed(const Duration(seconds: 2)); 
-      
+      await _engine.setModel(
+        LlamaModel(ModelSource.parse(modelUri)),
+        params: const ModelParams(
+          contextSize: 2048,
+          gpuLayers: 0,
+        ),
+        download: ModelLoadOptions(
+          cancelToken: _cancelToken,
+        ),
+        onProgress: (progress) {
+          if (mounted) {
+            setState(() {
+              _progress = progress.fraction;
+            });
+          }
+        },
+      );
+
+      if (!mounted) return;
+
+      _session = ChatSession(
+        _engine,
+        systemPrompt: '''
+You are Ethio Edu AI, an educational tutor
+for Ethiopian students in grades 9-12.
+
+Explain concepts clearly and step by step.
+Support Amharic and English.
+Help students with Mathematics, Physics,
+Chemistry, Biology and other school subjects.
+Use simple language and educational examples.
+If you do not know an answer, say so honestly.
+''',
+      );
+
       setState(() {
-        _messages.add({
-          "sender": "ai", 
-          "message": "ይህ ከኢትዮጵያ 9-12ኛ ክፍል መማሪያ መጽሐፍት የተሰጠ ከመስመር ውጭ ምላሽ ነው..."
-        });
+        _status = 'Ethio Edu AI ዝግጁ ነው!';
       });
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('ስህተት ተፈጥሯል: $e'), backgroundColor: Colors.red),
-      );
-    } finally {
+
       setState(() {
-        _isLoading = false;
+        _status = 'Model loading failed: $e';
       });
     }
   }
 
-  void _checkForUpdate() {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('ማሻሻያ (Update)'),
-        content: const Text('አፕሊኬሽኑ ወቅታዊና ትክክለኛ ስሪት ላይ ይገኛል!'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('እሺ'),
-          ),
+  Future<void> _sendMessage() async {
+    final text = _input.text.trim();
+    final session = _session;
+
+    if (text.isEmpty || session == null || _generating) {
+      return;
+    }
+
+    final reply = ChatMessage('', false);
+
+    setState(() {
+      _input.clear();
+      _messages.add(ChatMessage(text, true));
+      _messages.add(reply);
+      _generating = true;
+    });
+
+    try {
+      await for (final chunk in session.create(
+        <LlamaContentPart>[
+          LlamaTextContent(text),
         ],
-      ),
-    );
+        params: const GenerationParams(
+          maxTokens: 256,
+          temp: 0.7,
+        ),
+      )) {
+        if (chunk.text.isNotEmpty && mounted) {
+          setState(() {
+            reply.text += chunk.text;
+          });
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          reply.text += '\nError: $e';
+        });
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _generating = false;
+        });
+      }
+    }
+  }
+
+  void _stopGeneration() {
+    _engine.cancelGeneration();
+  }
+
+  @override
+  void dispose() {
+    _cancelToken.cancel();
+    _engine.cancelGeneration();
+    unawaited(_engine.dispose());
+    _input.dispose();
+    super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Ethio Edu AI - 9-12ኛ ክፍል'),
-        backgroundColor: Colors.blue[800],
+        backgroundColor: Colors.blue,
         foregroundColor: Colors.white,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.system_update),
-            tooltip: 'Check for Updates',
-            onPressed: _checkForUpdate,
-          ),
-        ],
+        title: const Text('Ethio Edu AI - Grade 9-12'),
       ),
       body: Column(
         children: [
-          if (!_isModelDownloaded)
-            Container(
-              color: Colors.amber[100],
+          if (_session == null) ...[
+            LinearProgressIndicator(value: _progress),
+            Padding(
               padding: const EdgeInsets.all(12),
-              child: Column(
-                children: [
-                  const Text(
-                    'የ AI ሞዴል በስልክዎ ላይ አልተገኘም። እባክዎ ከመስመር ውጭ ለመጠቀም አንዴ ያውርዱት።',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(fontWeight: FontWeight.bold),
-                  ),
-                  const SizedBox(height: 8),
-                  if (_isLoading)
-                    LinearProgressIndicator(value: _downloadProgress)
-                  else
-                    ElevatedButton.icon(
-                      onPressed: _downloadAiModel,
-                      icon: const Icon(Icons.download),
-                      label: const Text('የ AI ሞዴል አውርድ'),
-                    ),
-                ],
+              child: Text(
+                _status,
+                textAlign: TextAlign.center,
               ),
             ),
-          
+          ],
           Expanded(
             child: ListView.builder(
               padding: const EdgeInsets.all(12),
               itemCount: _messages.length,
               itemBuilder: (context, index) {
-                final msg = _messages[index];
-                final isUser = msg["sender"] == "user";
+                final message = _messages[index];
+
                 return Align(
-                  alignment: isUser ? Alignment.centerRight : Alignment.centerLeft,
+                  alignment: message.isUser
+                      ? Alignment.centerRight
+                      : Alignment.centerLeft,
                   child: Container(
-                    margin: const EdgeInsets.symmetric(vertical: 4),
-                    padding: const EdgeInsets.all(12),
+                    margin: const EdgeInsets.symmetric(
+                      vertical: 6,
+                    ),
+                    padding: const EdgeInsets.all(14),
+                    constraints: const BoxConstraints(
+                      maxWidth: 320,
+                    ),
                     decoration: BoxDecoration(
-                      color: isUser ? Colors.blue[100] : Colors.grey[200],
-                      borderRadius: BorderRadius.circular(8),
+                      color: message.isUser
+                          ? Colors.blue.shade100
+                          : Colors.grey.shade200,
+                      borderRadius: BorderRadius.circular(14),
                     ),
                     child: Text(
-                      msg["message"] ?? '',
+                      message.text.isEmpty ? '...' : message.text,
                       style: const TextStyle(fontSize: 16),
                     ),
                   ),
@@ -186,30 +230,33 @@ class _ChatScreenState extends State<ChatScreen> {
               },
             ),
           ),
-          
-          Container(
-            padding: const EdgeInsets.all(8),
-            color: Colors.grey[100],
-            child: Row(
-              children: [
-                Expanded(
-                  child: TextField(
-                    controller: _controller,
-                    decoration: const InputDecoration(
-                      hintText: 'ጥያቄዎን እዚህ ይጻፉ...',
-                      border: OutlineInputBorder(),
-                      filled: true,
-                      fillColor: Colors.white,
+          SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.all(10),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: _input,
+                      enabled: _session != null && !_generating,
+                      onSubmitted: (_) => _sendMessage(),
+                      decoration: const InputDecoration(
+                        hintText: 'ጥያቄህን እዚህ ጻፍ...',
+                        border: OutlineInputBorder(),
+                      ),
                     ),
-                    onSubmitted: (_) => _sendMessage(),
                   ),
-                ),
-                const SizedBox(width: 8),
-                IconButton(
-                  icon: const Icon(Icons.send, color: Colors.blue),
-                  onPressed: _sendMessage,
-                ),
-              ],
+                  IconButton(
+                    onPressed: _generating
+                        ? _stopGeneration
+                        : (_session == null ? null : _sendMessage),
+                    icon: Icon(
+                      _generating ? Icons.stop : Icons.send,
+                      color: Colors.blue,
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         ],
