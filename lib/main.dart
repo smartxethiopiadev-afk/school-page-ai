@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 
 void main() {
   runApp(const EthioEduAiApp());
@@ -33,11 +32,50 @@ class _ChatScreenState extends State<ChatScreen> {
   final TextEditingController _controller = TextEditingController();
   final List> _messages = [];
   bool _isLoading = false;
+  bool _isModelDownloaded = false; // ሞዴሉ መውረዱን እና አለመውረዱን ለመቆጣጠር
+  double _downloadProgress = 0.0;
 
-  // AI መልስ የማስመሰል ወይም የማገናኘት ሎጂክ
+  // 1. የ AI ሞዴሉን ከኢንተርኔት አፕ ውስጥ ሆኖ የማውረድ ሎጂክ (In-App Download)
+  void _downloadAiModel() async {
+    setState(() {
+      _isLoading = true;
+    });
+
+    // የማስመሰያ የዳውንሎድ ሂደት (Progress) - እዚህ ጋር ትክክለኛውን የ Dio/Http ማወረጃ ኮድ ማስገባት ይቻላል
+    for (int i = 1; i <= 5; i++) {
+      await Future.delayed(const Duration(seconds: 1));
+      setState(() {
+        _downloadProgress = i / 5;
+      });
+    }
+
+    setState(() {
+      _isLoading = false;
+      _isModelDownloaded = true;
+    });
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('የ Gemma AI ሞዴል በተሳካ ሁኔታ ወርዷል! አሁን ከመስመር ውጭ መጠቀም ይችላሉ።'),
+        backgroundColor: Colors.green,
+      ),
+    );
+  }
+
+  // 2. መልዕክት የመላክ እና የ AI ምላሽ ማግኛ ፈንክሽን
   Future<void> _sendMessage() async {
     final text = _controller.text.trim();
     if (text.isEmpty) return;
+
+    if (!_isModelDownloaded) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('እባክዎ መጀመሪያ የ AI ሞዴሉን ያውርዱ!'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
 
     setState(() {
       _messages.add({"sender": "user", "message": text});
@@ -47,19 +85,18 @@ class _ChatScreenState extends State<ChatScreen> {
     _controller.clear();
 
     try {
-      // እዚህ ጋር የ AI ሞዴል (WebLLM ወይም API) ጥያቄ የሚላክበትን ኮድ ያስገቡ
-      await Future.delayed(const Duration(seconds: 2)); // የማስመሰያ ጊዜ
+      // እዚህ ጋር በስልኩ ውስጥ ካለው ሞዴል ጋር የመነጋገር ሎጂክ ይገባል
+      await Future.delayed(const Duration(seconds: 2)); 
       
       setState(() {
         _messages.add({
           "sender": "ai", 
-          "message": "ይህ ከኢትዮጵያ 9-12ኛ ክፍል መማሪያ መጽሐፍት የተወሰደ ምላሽ ነው: ለጠየቁት ጥያቄ..."
+          "message": "ይህ ከኢትዮጵያ 9-12ኛ ክፍል መማሪያ መጽሐፍት የተሰጠ ከመስመር ውጭ (Offline) ምላሽ ነው..."
         });
       });
     } catch (e) {
-      // ስህተት ሲፈጠር ለተማሪው በ Error Display (SnackBar) ማሳየት
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('ስህተት ተፈጥሯል: $e', style: const TextStyle(color: Colors.white)), backgroundColor: Colors.red),
+        SnackBar(content: Text('ስህተት ተፈጥሯል: $e'), backgroundColor: Colors.red),
       );
     } finally {
       setState(() {
@@ -68,7 +105,7 @@ class _ChatScreenState extends State<ChatScreen> {
     }
   }
 
-  // Update መፈተሻ ፈንክሽን
+  // 3. ማሻሻያ (Update) መፈተሻ ፈንክሽን
   void _checkForUpdate() {
     showDialog(
       context: context,
@@ -93,7 +130,6 @@ class _ChatScreenState extends State<ChatScreen> {
         backgroundColor: Colors.blue[800],
         foregroundColor: Colors.white,
         actions: [
-          // Update ቁልፍ
           IconButton(
             icon: const Icon(Icons.system_update),
             tooltip: 'Check for Updates',
@@ -103,6 +139,31 @@ class _ChatScreenState extends State<ChatScreen> {
       ),
       body: Column(
         children: [
+          // ሞዴሉ ካልወረደ የማውረድ ማስጠንቀቂያ እና ባር ማሳየት
+          if (!_isModelDownloaded)
+            Container(
+              color: Colors.amber[100],
+              padding: const EdgeInsets.all(12),
+              child: Column(
+                children: [
+                  const Text(
+                    'የ AI ሞዴል (Gemma) በስልክዎ ላይ አልተገኘም። እባክዎ ከመስመር ውጭ ለመጠቀም አንዴ ያውርዱት።',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 8),
+                  if (_isLoading)
+                    LinearProgressIndicator(value: _downloadProgress)
+                  else
+                    ElevatedButton.icon(
+                      onPressed: _downloadAiModel,
+                      icon: const Icon(Icons.download),
+                      label: const Text('የ AI ሞዴል አውርድ (Download)'),
+                    ),
+                ],
+              ),
+            ),
+          
           // የመልዕክቶች ማሳያ ዝርዝር
           Expanded(
             child: ListView.builder(
@@ -113,7 +174,7 @@ class _ChatScreenState extends State<ChatScreen> {
                 final isUser = msg["sender"] == "user";
                 return Align(
                   alignment: isUser ? Alignment.centerRight : Alignment.centerLeft,
-                  Container(
+                  child: Container(
                     margin: const EdgeInsets.symmetric(vertical: 4),
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
@@ -129,11 +190,7 @@ class _ChatScreenState extends State<ChatScreen> {
               },
             ),
           ),
-          if (_isLoading)
-            const Padding(
-              padding: EdgeInsets.all(8.0),
-              child: CircularProgressIndicator(),
-            ),
+          
           // የጽሁፍ መጻፊያ እና መላኪያ ክፍል
           Container(
             padding: const EdgeInsets.all(8),
