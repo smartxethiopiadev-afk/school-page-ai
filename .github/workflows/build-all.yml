@@ -1,37 +1,22 @@
-name: Build Ethio Edu AI (EXE, APK, & PWA)
+name: Build Ethio Edu AI (APK & EXE)
 
 on:
   push:
     branches: [ "main" ]
 
 jobs:
-  build-all:
+  build-android:
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # 1. ፔይተንን (Python) ማዘጋጀት (ለምሳሌ ዳታዎችን ወይም ስክሪፕቶችን ለማቀናበር)
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.10'
-
-      # 2. ዱቤዎችን ወይም ስክሪፕቶችን ማስኬድ ካፈለጉ
-      - name: Run setup script (if any)
-        run: |
-          python -m pip install --upgrade pip
-          if [ -f "requirements.txt" ]; then pip install -r requirements.txt; fi
-
-      # 3. ጃቫ (Java) ማዘጋጀት (ለ Android APK ግንባታ ግዴታ ነው)
       - name: Set up Java
         uses: actions/setup-java@v4
         with:
           distribution: 'zulu'
           java-version: '17'
 
-      # 4. ፍላተርን (Flutter) ማዘጋጀት
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:
@@ -40,37 +25,15 @@ jobs:
       - name: Install Flutter Dependencies
         run: flutter pub get
 
-      # 5. [AI Model Check]: AI ሞዴሉ (ወይም ፋይሉ) በፕሮጀክቱ ውስጥ መኖሩን ማረጋገጥ (ካልተገኘ BuildAction ስህተት አሳይቶ ይቆማል)
-      - name: Check AI Model Existence
-        run: |
-          echo "Checking if AI model or required assets exist..."
-          # እዚህ ጋር የሞዴል ፋይሉ የሚቀመጥበትን ትክክለኛ መንገድ (Path) ያስገቡ
-          if [ ! -d "assets/models" ] && [ ! -f "assets/model.gguf" ]; then
-            echo "Error: AI Model is missing from the software repository!"
-            echo "Please add the AI model file before building."
-            exit 1
-          else
-            echo "AI Model found successfully!"
-          fi
-
-      # 6. የ Android APK ግንባታ
       - name: Build Android APK
         run: flutter build apk --release
 
-      # 7. የ Flutter Web (PWA) ግንባታ
-      - name: Build Flutter Web (PWA)
-        run: flutter build web --release
-
-      # 8. ፋይሎቹን (APK, Web, እና የሚፈልጓቸውን Artifacts) በአንድ ላይ ማሰባሰብ
-      - name: Upload Build Artifacts (APK & Web)
+      - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: Ethio-Edu-AI-Builds
-          path: |
-            build/app/outputs/flutter-apk/app-release.apk
-            build/web/
+          name: Ethio-Edu-AI-Android-APK
+          path: build/app/outputs/flutter-apk/app-release.apk
 
-  # 9. የ Windows EXE ግንባታ (በዊንዶውስ ሰርቨር ላይ የሚሄድ)
   build-windows:
     runs-on: windows-latest
     steps:
@@ -85,6 +48,10 @@ jobs:
       - name: Install Flutter Dependencies
         run: flutter pub get
 
+      # የዊንዶውስ ዴስክቶፕ ድጋፍ በራስ-ሰር እንዲዋቀር ማድረግ
+      - name: Add Windows Support
+        run: flutter create . --platforms=windows
+
       - name: Build Windows EXE
         run: flutter build windows --release
 
@@ -93,3 +60,4 @@ jobs:
         with:
           name: Ethio-Edu-AI-Windows-EXE
           path: build/windows/x64/runner/Release/
+          
