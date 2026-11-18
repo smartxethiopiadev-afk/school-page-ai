@@ -1,4 +1,4 @@
-name: Build School Page AI (3-Architecture APK + Shorebird OTA)
+name: Build School Page AI (Full APKs + Shorebird OTA)
 
 on:
   push:
@@ -8,19 +8,19 @@ on:
       update_mode:
         description: "Select Build / Update System"
         required: true
-        default: "shorebird_patch"
+        default: "shorebird_release"
         type: choice
         options:
-          - shorebird_patch      # 1. OTA Patch (ጥቂት KB ብቻ - ሙሉ APK ሳይወርድ አፑን ያድሳል)
-          - shorebird_release    # 2. Shorebird Base APK (Universal + 64-bit + 32-bit)
-          - classic_multi_apk    # 3. ክላሲክ 3 አይነት APK (32-bit, 64-bit, Universal) + Windows EXE
+          - shorebird_release    # 1. ሁልጊዜ ሙሉ Shorebird APK (Universal + 64-bit + 32-bit)
+          - shorebird_patch      # 2. ፈጣን OTA Patch (ጥቂት KB ብቻ - በአፑ Update ቁልፍ የሚጫን)
+          - classic_multi_apk    # 3. ክላሲክ ሙሉ 3 አይነት APK + Windows EXE
 
 permissions:
   contents: write
 
 jobs:
   # =========================================================================
-  # 1 & 2. SHOREBIRD SYSTEM (OTA PATCH & 3-TYPE RELEASE APKs)
+  # 1 & 2. SHOREBIRD SYSTEM (ALWAYS FULL 3-TYPE APKs OR OTA PATCH)
   # =========================================================================
   shorebird-android:
     name: Shorebird Build (${{ github.event.inputs.update_mode || 'shorebird_release' }})
@@ -37,11 +37,11 @@ jobs:
           distribution: zulu
           java-version: "17"
 
-      - name: Setup Flutter
+      - name: Setup Flutter (Dart >= 3.10.7 Compatible)
         uses: subosito/flutter-action@v2
         with:
           channel: stable
-          flutter-version: "3.29.0"
+          flutter-version: "3.50.0"
           cache: true
 
       - name: Setup Shorebird
@@ -49,7 +49,7 @@ jobs:
         with:
           cache: true
 
-      - name: Create Android Support Files
+      - name: Create Android Support Files Automatically
         run: flutter create . --platforms=android
 
       - name: Configure Android Permissions
@@ -85,36 +85,36 @@ jobs:
             git push
           fi
 
-      - name: Execute Shorebird Release (3 APKs) or OTA Patch
+      - name: Execute Shorebird Release or Patch
         env:
           SHOREBIRD_TOKEN: ${{ secrets.SHOREBIRD_TOKEN }}
         run: |
           MODE="${{ github.event.inputs.update_mode }}"
-          if [ "$MODE" == "shorebird_release" ] || [ -z "$MODE" ]; then
-            echo "Building Shorebird Universal APK..."
-            shorebird release android --artifact apk
-            echo "Building Shorebird Split APKs (32-bit armv7 & 64-bit arm64)..."
-            shorebird release android --artifact apk -- --split-per-abi
-          else
-            echo "Pushing Fast OTA Patch (No Full APK Download Needed)..."
+          if [ "$MODE" == "shorebird_patch" ]; then
+            echo "Pushing Fast OTA Patch..."
             shorebird patch android --force
+          else
+            echo "Building Full Shorebird Universal APK..."
+            shorebird release android --artifact apk
+            echo "Building Full Shorebird Split APKs (64-bit & 32-bit)..."
+            shorebird release android --artifact apk -- --split-per-abi
           fi
 
-      - name: Upload 3 Types of Shorebird APKs
+      - name: Upload All 3 Full Shorebird APKs
         if: github.event.inputs.update_mode != 'shorebird_patch'
         uses: actions/upload-artifact@v4
         with:
-          name: School-Page-AI-Shorebird-3-APKs
+          name: School-Page-AI-Shorebird-Full-APKs
           path: |
             build/app/outputs/flutter-apk/app-release.apk
             build/app/outputs/flutter-apk/app-arm64-v8a-release.apk
             build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk
 
   # =========================================================================
-  # 3. CLASSIC FALLBACK SYSTEM (3-TYPE ANDROID APKs + WINDOWS EXE)
+  # 3. CLASSIC FALLBACK SYSTEM (ALWAYS FULL 3-TYPE APKs + WINDOWS EXE)
   # =========================================================================
   classic-android:
-    name: Classic 3-Architecture Android APKs
+    name: Classic Full 3-Architecture Android APKs
     if: github.event.inputs.update_mode == 'classic_multi_apk'
     runs-on: ubuntu-latest
 
@@ -132,10 +132,10 @@ jobs:
         uses: subosito/flutter-action@v2
         with:
           channel: stable
-          flutter-version: "3.29.0"
+          flutter-version: "3.50.0"
           cache: true
 
-      - name: Create Android Support
+      - name: Create Android Support Files Automatically
         run: flutter create . --platforms=android
 
       - name: Enable Internet Permission
@@ -158,16 +158,16 @@ jobs:
       - name: Install Dependencies
         run: flutter pub get
 
-      - name: Build Universal APK (All Phones)
+      - name: Build Full Universal APK
         run: flutter build apk --release
 
-      - name: Build Split APKs (64-bit arm64 & 32-bit armv7)
+      - name: Build Full Split APKs (64-bit & 32-bit)
         run: flutter build apk --release --split-per-abi
 
-      - name: Upload Classic 3-Type APKs
+      - name: Upload Classic Full 3-Type APKs
         uses: actions/upload-artifact@v4
         with:
-          name: School-Page-AI-Classic-3-APKs
+          name: School-Page-AI-Classic-Full-APKs
           path: |
             build/app/outputs/flutter-apk/app-release.apk
             build/app/outputs/flutter-apk/app-arm64-v8a-release.apk
@@ -186,7 +186,7 @@ jobs:
         uses: subosito/flutter-action@v2
         with:
           channel: stable
-          flutter-version: "3.29.0"
+          flutter-version: "3.50.0"
           cache: true
 
       - name: Create Windows Support
@@ -211,3 +211,4 @@ jobs:
         with:
           name: School-Page-AI-Windows
           path: School-Page-AI-Windows.zip
+          
