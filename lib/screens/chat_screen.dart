@@ -202,13 +202,13 @@ class _ChatScreenState extends State<ChatScreen> {
     }
   }
 
-  Widget _buildSuggestionCard({
+    Widget _buildSuggestionCard({
     required IconData icon,
     required String title,
     required String subtitle,
     required String prompt,
   }) {
-    return InkWell(
+    return InkWell( // <-- እዚህ ጋር 'const' የሚለውን አጥፋው (መጀመሪያ 'const InkWell(' ነበር)
       onPressed: _session == null ? null : () => _sendMessage(prompt),
       borderRadius: BorderRadius.circular(16),
       child: Container(
@@ -257,7 +257,8 @@ class _ChatScreenState extends State<ChatScreen> {
         ),
       ),
     );
-  }
+    }
+  
 
   @override
   void dispose() {
