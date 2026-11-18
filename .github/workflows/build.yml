@@ -37,34 +37,38 @@ jobs:
           distribution: zulu
           java-version: "17"
 
-      - name: Setup Flutter (Dart >= 3.6.0 Compatible)
-        uses: subosito/flutter-action@v2
-        with:
-          channel: stable
-          flutter-version: "3.27.1"
-          cache: true
-
+      # Shorebird መጀመሪያ ይጫናል (አዲሱን Flutter እንዳይሸፍን)
       - name: Setup Shorebird
         uses: shorebirdtech/setup-shorebird@v1
         with:
           cache: true
+
+      # አዲሱ Flutter (Dart >= 3.10.7) ከShorebird በኋላ ስለሚጫን ቅድሚያ ይኖረዋል
+      - name: Setup Flutter (Dart >= 3.10.7)
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: "3.50.0"
+          cache: true
+
+      - name: Create Android Support Files Automatically
+        run: flutter create . --platforms=android
 
       - name: Configure Android Permissions
         run: |
           python3 - <<'PY'
           from pathlib import Path
           p = Path("android/app/src/main/AndroidManifest.xml")
-          if p.exists():
-              s = p.read_text()
-              perms = [
-                  '<uses-permission android:name="android.permission.INTERNET"/>',
-                  '<uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>'
-              ]
-              for perm in perms:
-                  if perm not in s:
-                      pos = s.find("<application")
-                      s = s[:pos] + "    " + perm + "\n    " + s[pos:]
-              p.write_text(s)
+          s = p.read_text()
+          perms = [
+              '<uses-permission android:name="android.permission.INTERNET"/>',
+              '<uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>'
+          ]
+          for perm in perms:
+              if perm not in s:
+                  pos = s.find("<application")
+                  s = s[:pos] + "    " + perm + "\n    " + s[pos:]
+          p.write_text(s)
           PY
 
       - name: Install Flutter Dependencies
@@ -90,12 +94,12 @@ jobs:
           MODE="${{ github.event.inputs.update_mode }}"
           if [ "$MODE" == "shorebird_patch" ]; then
             echo "Pushing Fast OTA Patch..."
-            shorebird patch android --force
+            shorebird patch android --force --flutter-version=3.50.0
           else
             echo "Building Full Shorebird Universal APK..."
-            shorebird release android --artifact apk
+            shorebird release android --artifact apk --flutter-version=3.50.0
             echo "Building Full Shorebird Split APKs (64-bit & 32-bit)..."
-            shorebird release android --artifact apk -- --split-per-abi
+            shorebird release android --artifact apk --flutter-version=3.50.0 -- --split-per-abi
           fi
 
       - name: Upload All 3 Full Shorebird APKs
@@ -130,25 +134,27 @@ jobs:
         uses: subosito/flutter-action@v2
         with:
           channel: stable
-          flutter-version: "3.27.1"
+          flutter-version: "3.50.0"
           cache: true
+
+      - name: Create Android Support Files Automatically
+        run: flutter create . --platforms=android
 
       - name: Enable Internet Permission
         run: |
           python3 - <<'PY'
           from pathlib import Path
           p = Path("android/app/src/main/AndroidManifest.xml")
-          if p.exists():
-              s = p.read_text()
-              perms = [
-                  '<uses-permission android:name="android.permission.INTERNET"/>',
-                  '<uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>'
-              ]
-              for perm in perms:
-                  if perm not in s:
-                      pos = s.find("<application")
-                      s = s[:pos] + "    " + perm + "\n    " + s[pos:]
-              p.write_text(s)
+          s = p.read_text()
+          perms = [
+              '<uses-permission android:name="android.permission.INTERNET"/>',
+              '<uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>'
+          ]
+          for perm in perms:
+              if perm not in s:
+                  pos = s.find("<application")
+                  s = s[:pos] + "    " + perm + "\n    " + s[pos:]
+          p.write_text(s)
           PY
 
       - name: Install Dependencies
@@ -182,8 +188,11 @@ jobs:
         uses: subosito/flutter-action@v2
         with:
           channel: stable
-          flutter-version: "3.27.1"
+          flutter-version: "3.50.0"
           cache: true
+
+      - name: Create Windows Support
+        run: flutter create . --platforms=windows
 
       - name: Install Dependencies
         run: flutter pub get
