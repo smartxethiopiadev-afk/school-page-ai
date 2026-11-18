@@ -41,7 +41,7 @@ jobs:
         uses: subosito/flutter-action@v2
         with:
           channel: stable
-          flutter-version: "3.50.0"
+          flutter-version: "3.24.3"
           cache: true
 
       - name: Setup Shorebird
@@ -49,24 +49,22 @@ jobs:
         with:
           cache: true
 
-      - name: Create Android Support Files Automatically
-        run: flutter create . --platforms=android
-
       - name: Configure Android Permissions
         run: |
           python3 - <<'PY'
           from pathlib import Path
           p = Path("android/app/src/main/AndroidManifest.xml")
-          s = p.read_text()
-          perms = [
-              '<uses-permission android:name="android.permission.INTERNET"/>',
-              '<uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>'
-          ]
-          for perm in perms:
-              if perm not in s:
-                  pos = s.find("<application")
-                  s = s[:pos] + "    " + perm + "\n    " + s[pos:]
-          p.write_text(s)
+          if p.exists():
+              s = p.read_text()
+              perms = [
+                  '<uses-permission android:name="android.permission.INTERNET"/>',
+                  '<uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>'
+              ]
+              for perm in perms:
+                  if perm not in s:
+                      pos = s.find("<application")
+                      s = s[:pos] + "    " + perm + "\n    " + s[pos:]
+              p.write_text(s)
           PY
 
       - name: Install Flutter Dependencies
@@ -132,27 +130,25 @@ jobs:
         uses: subosito/flutter-action@v2
         with:
           channel: stable
-          flutter-version: "3.50.0"
+          flutter-version: "3.24.3"
           cache: true
-
-      - name: Create Android Support Files Automatically
-        run: flutter create . --platforms=android
 
       - name: Enable Internet Permission
         run: |
           python3 - <<'PY'
           from pathlib import Path
           p = Path("android/app/src/main/AndroidManifest.xml")
-          s = p.read_text()
-          perms = [
-              '<uses-permission android:name="android.permission.INTERNET"/>',
-              '<uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>'
-          ]
-          for perm in perms:
-              if perm not in s:
-                  pos = s.find("<application")
-                  s = s[:pos] + "    " + perm + "\n    " + s[pos:]
-          p.write_text(s)
+          if p.exists():
+              s = p.read_text()
+              perms = [
+                  '<uses-permission android:name="android.permission.INTERNET"/>',
+                  '<uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>'
+              ]
+              for perm in perms:
+                  if perm not in s:
+                      pos = s.find("<application")
+                      s = s[:pos] + "    " + perm + "\n    " + s[pos:]
+              p.write_text(s)
           PY
 
       - name: Install Dependencies
@@ -186,11 +182,8 @@ jobs:
         uses: subosito/flutter-action@v2
         with:
           channel: stable
-          flutter-version: "3.50.0"
+          flutter-version: "3.24.3"
           cache: true
-
-      - name: Create Windows Support
-        run: flutter create . --platforms=windows
 
       - name: Install Dependencies
         run: flutter pub get
