@@ -37,13 +37,11 @@ jobs:
           distribution: zulu
           java-version: "17"
 
-      # Shorebird መጀመሪያ ይጫናል (አዲሱን Flutter እንዳይሸፍን)
       - name: Setup Shorebird
         uses: shorebirdtech/setup-shorebird@v1
         with:
           cache: true
 
-      # አዲሱ Flutter (Dart >= 3.10.7) ከShorebird በኋላ ስለሚጫን ቅድሚያ ይኖረዋል
       - name: Setup Flutter (Dart >= 3.10.7)
         uses: subosito/flutter-action@v2
         with:
@@ -94,12 +92,12 @@ jobs:
           MODE="${{ github.event.inputs.update_mode }}"
           if [ "$MODE" == "shorebird_patch" ]; then
             echo "Pushing Fast OTA Patch..."
-            shorebird patch android --force --flutter-version=3.50.0
+            shorebird patch android --force
           else
             echo "Building Full Shorebird Universal APK..."
-            shorebird release android --artifact apk --flutter-version=3.50.0
+            shorebird release android --artifact apk
             echo "Building Full Shorebird Split APKs (64-bit & 32-bit)..."
-            shorebird release android --artifact apk --flutter-version=3.50.0 -- --split-per-abi
+            shorebird release android --artifact apk -- --split-per-abi
           fi
 
       - name: Upload All 3 Full Shorebird APKs
