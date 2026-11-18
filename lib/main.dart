@@ -1,266 +1,141 @@
-import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:llamadart/llamadart.dart';
-
-const String modelUri =
-    'hf://unsloth/gemma-3-1b-it-GGUF/'
-    'gemma-3-1b-it-Q4_K_M.gguf';
+import 'package:shorebird_code_push/shorebird_code_push.dart';
+import 'screens/chat_screen.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
-  runApp(const EthioEduAI());
+  runApp(const SchoolPageAIApp());
 }
 
-class EthioEduAI extends StatelessWidget {
-  const EthioEduAI({super.key});
+class SchoolPageAIApp extends StatelessWidget {
+  const SchoolPageAIApp({super.key});
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
-      title: 'Ethio Edu AI',
-      theme: ThemeData(
-        colorSchemeSeed: Colors.blue,
-        useMaterial3: true,
+      title: 'School Page AI',
+      theme: ThemeData.dark(useMaterial3: true).copyWith(
+        scaffoldBackgroundColor: const Color(0xFF131314),
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: Colors.blueAccent,
+          brightness: Brightness.dark,
+        ),
+        appBarTheme: const AppBarTheme(
+          backgroundColor: Color(0xFF131314),
+          foregroundColor: Colors.white,
+          elevation: 0,
+        ),
       ),
       home: const ChatScreen(),
     );
   }
 }
 
-class ChatMessage {
-  ChatMessage(this.text, this.isUser);
-
-  String text;
-  final bool isUser;
-}
-
-class ChatScreen extends StatefulWidget {
-  const ChatScreen({super.key});
+/// በAppBar ወይም በDrawer ውስጥ የሚቀመጥ ራሱን የቻለ የUpdate ቁልፍ (OTA Patch Checker)
+class AppUpdateButton extends StatefulWidget {
+  const AppUpdateButton({super.key});
 
   @override
-  State<ChatScreen> createState() => _ChatScreenState();
+  State<AppUpdateButton> createState() => _AppUpdateButtonState();
 }
 
-class _ChatScreenState extends State<ChatScreen> {
-  final LlamaEngine _engine = LlamaEngine(LlamaBackend());
-  final ModelDownloadCancelToken _cancelToken =
-      ModelDownloadCancelToken();
+class _AppUpdateButtonState extends State<AppUpdateButton> {
+  final ShorebirdUpdater _updater = ShorebirdUpdater();
+  bool _isChecking = false;
 
-  final TextEditingController _input = TextEditingController();
-  final List<ChatMessage> _messages = [];
+  Future<void> _checkForUpdates() async {
+    if (_isChecking) return;
 
-  ChatSession? _session;
-
-  String _status = 'AI Model በመዘጋጀት ላይ...';
-  double? _progress;
-  bool _generating = false;
-
-  @override
-  void initState() {
-    super.initState();
-    unawaited(_loadModel());
-  }
-
-  Future<void> _loadModel() async {
-    setState(() {
-      _status = 'Gemma AI Model በማውረድ ላይ...';
-    });
-
-    try {
-      await _engine.setModel(
-        LlamaModel(ModelSource.parse(modelUri)),
-        params: const ModelParams(
-          contextSize: 2048,
-          gpuLayers: 0,
-        ),
-        download: ModelLoadOptions(
-          cancelToken: _cancelToken,
-        ),
-        onProgress: (progress) {
-          if (mounted) {
-            setState(() {
-              _progress = progress.fraction;
-            });
-          }
-        },
-      );
-
-      if (!mounted) return;
-
-      _session = ChatSession(
-        _engine,
-        systemPrompt: '''
-You are Ethio Edu AI, an educational tutor
-for Ethiopian students in grades 9-12.
-
-Explain concepts clearly and step by step.
-Support Amharic and English.
-Help students with Mathematics, Physics,
-Chemistry, Biology and other school subjects.
-Use simple language and educational examples.
-If you do not know an answer, say so honestly.
-''',
-      );
-
-      setState(() {
-        _status = 'Ethio Edu AI ዝግጁ ነው!';
-      });
-    } catch (e) {
-      if (!mounted) return;
-
-      setState(() {
-        _status = 'Model loading failed: $e';
-      });
-    }
-  }
-
-  Future<void> _sendMessage() async {
-    final text = _input.text.trim();
-    final session = _session;
-
-    if (text.isEmpty || session == null || _generating) {
+    // Shorebird በRelease APK ላይ ብቻ ስለሚሰራ መገኘቱን ያረጋግጣል
+    if (!_updater.isAvailable) {
+      _showSnackBar('Update የሚሰራው በShorebird Release APK ላይ ብቻ ነው።');
       return;
     }
 
-    final reply = ChatMessage('', false);
-
-    setState(() {
-      _input.clear();
-      _messages.add(ChatMessage(text, true));
-      _messages.add(reply);
-      _generating = true;
-    });
+    setState(() => _isChecking = true);
+    _showSnackBar('አዲስ ማሻሻያ በመፈለግ ላይ (Checking for updates)...');
 
     try {
-      await for (final chunk in session.create(
-        <LlamaContentPart>[
-          LlamaTextContent(text),
-        ],
-        params: const GenerationParams(
-          maxTokens: 256,
-          temp: 0.7,
-        ),
-      )) {
-        if (chunk.text.isNotEmpty && mounted) {
-          setState(() {
-            reply.text += chunk.text;
-          });
+      final status = await _updater.checkForUpdate();
+
+      if (status == UpdateStatus.outdated) {
+        _showSnackBar('አዲስ Update ተገኝቷል! በመጫን ላይ...');
+        await _updater.update();
+        if (mounted) {
+          _showRestartDialog();
         }
+      } else if (status == UpdateStatus.restartRequired) {
+        if (mounted) {
+          _showRestartDialog();
+        }
+      } else {
+        _showSnackBar('School Page AI አዲስ ነው (Up to date!) ✅');
       }
     } catch (e) {
-      if (mounted) {
-        setState(() {
-          reply.text += '\nError: $e';
-        });
-      }
+      _showSnackBar('Update መፈለግ አልተቻለም: ኢንተርኔትዎን ያረጋግጡ');
     } finally {
       if (mounted) {
-        setState(() {
-          _generating = false;
-        });
+        setState(() => _isChecking = false);
       }
     }
   }
 
-  void _stopGeneration() {
-    _engine.cancelGeneration();
+  void _showSnackBar(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).clearSnackBars();
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        behavior: SnackBarBehavior.floating,
+        duration: const Duration(seconds: 3),
+      ),
+    );
   }
 
-  @override
-  void dispose() {
-    _cancelToken.cancel();
-    _engine.cancelGeneration();
-    unawaited(_engine.dispose());
-    _input.dispose();
-    super.dispose();
+  void _showRestartDialog() {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        backgroundColor: const Color(0xFF1E1F22),
+        title: const Row(
+          children: [
+            Icon(Icons.system_update_alt, color: Colors.blueAccent),
+            SizedBox(width: 10),
+            Text('Update ተጭኗል!', style: TextStyle(color: Colors.white)),
+          ],
+        ),
+        content: const Text(
+          'አዲሱ የSchool Page AI ማሻሻያ በተሳካ ሁኔታ ወርዷል። አዲሱን ለውጥ ለማየት አፑን ሙሉ በሙሉ ዘግተው እንደገና ይክፈቱት።',
+          style: TextStyle(color: Colors.white70),
+        ),
+        actions: [
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.blueAccent),
+            onPressed: () => Navigator.pop(context),
+            child: const Text('እሺ (OK)', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        backgroundColor: Colors.blue,
-        foregroundColor: Colors.white,
-        title: const Text('Ethio Edu AI - Grade 9-12'),
-      ),
-      body: Column(
-        children: [
-          if (_session == null) ...[
-            LinearProgressIndicator(value: _progress),
-            Padding(
-              padding: const EdgeInsets.all(12),
-              child: Text(
-                _status,
-                textAlign: TextAlign.center,
+    return IconButton(
+      tooltip: 'Check for App Update',
+      onPressed: _isChecking ? null : _checkForUpdates,
+      icon: _isChecking
+          ? const SizedBox(
+              width: 20,
+              height: 20,
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+                color: Colors.blueAccent,
               ),
-            ),
-          ],
-          Expanded(
-            child: ListView.builder(
-              padding: const EdgeInsets.all(12),
-              itemCount: _messages.length,
-              itemBuilder: (context, index) {
-                final message = _messages[index];
-
-                return Align(
-                  alignment: message.isUser
-                      ? Alignment.centerRight
-                      : Alignment.centerLeft,
-                  child: Container(
-                    margin: const EdgeInsets.symmetric(
-                      vertical: 6,
-                    ),
-                    padding: const EdgeInsets.all(14),
-                    constraints: const BoxConstraints(
-                      maxWidth: 320,
-                    ),
-                    decoration: BoxDecoration(
-                      color: message.isUser
-                          ? Colors.blue.shade100
-                          : Colors.grey.shade200,
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                    child: Text(
-                      message.text.isEmpty ? '...' : message.text,
-                      style: const TextStyle(fontSize: 16),
-                    ),
-                  ),
-                );
-              },
-            ),
-          ),
-          SafeArea(
-            child: Padding(
-              padding: const EdgeInsets.all(10),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: TextField(
-                      controller: _input,
-                      enabled: _session != null && !_generating,
-                      onSubmitted: (_) => _sendMessage(),
-                      decoration: const InputDecoration(
-                        hintText: 'ጥያቄህን እዚህ ጻፍ...',
-                        border: OutlineInputBorder(),
-                      ),
-                    ),
-                  ),
-                  IconButton(
-                    onPressed: _generating
-                        ? _stopGeneration
-                        : (_session == null ? null : _sendMessage),
-                    icon: Icon(
-                      _generating ? Icons.stop : Icons.send,
-                      color: Colors.blue,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ],
-      ),
+            )
+          : const Icon(Icons.system_update_rounded, color: Colors.blueAccent),
     );
   }
 }
