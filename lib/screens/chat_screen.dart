@@ -208,8 +208,8 @@ class _ChatScreenState extends State<ChatScreen> {
     required String subtitle,
     required String prompt,
   }) {
-    return InkWell( // <-- እዚህ ጋር 'const' የሚለውን አጥፋው (መጀመሪያ 'const InkWell(' ነበር)
-      onPressed: _session == null ? null : () => _sendMessage(prompt),
+    return InkWell(
+  onTap: _session == null ? null : () => _sendMessage(prompt),
       borderRadius: BorderRadius.circular(16),
       child: Container(
         width: double.infinity,
