@@ -1,16 +1,17 @@
-name: ethio_edu_ai
-description: "Offline AI Tutor for Ethiopian Grade 9-12 students"
+name: school_page_ai
+description: "School Page AI - Offline AI Tutor for Ethiopian Grade 9-12 Students"
 publish_to: 'none'
 version: 1.0.0+1
 
 environment:
-  sdk: '>=3.10.7 <4.0.0'
+  sdk: '>=3.5.0 <4.0.0'
 
 dependencies:
   flutter:
     sdk: flutter
   cupertino_icons: ^1.0.6
   llamadart: ^0.19.11
+  path_provider: ^2.1.4
 
 dev_dependencies:
   flutter_test:
