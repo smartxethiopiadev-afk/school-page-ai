@@ -11,7 +11,7 @@ on:
         default: "shorebird_release"
         type: choice
         options:
-          - shorebird_release    # 1. ሁልጊዜ ሙሉ Shorebird APK (Universal + 64-bit + 32-bit)
+          - shorebird_release    # 1. ሙሉ Shorebird Universal APK
           - shorebird_patch      # 2. ፈጣን OTA Patch (ጥቂት KB ብቻ - በአፑ Update ቁልፍ የሚጫን)
           - classic_multi_apk    # 3. ክላሲክ ሙሉ 3 አይነት APK + Windows EXE
 
@@ -20,7 +20,7 @@ permissions:
 
 jobs:
   # =========================================================================
-  # 1 & 2. SHOREBIRD SYSTEM (ALWAYS FULL 3-TYPE APKs OR OTA PATCH)
+  # 1 & 2. SHOREBIRD SYSTEM (UNIVERSAL APK OR OTA PATCH)
   # =========================================================================
   shorebird-android:
     name: Shorebird Build (${{ github.event.inputs.update_mode || 'shorebird_release' }})
@@ -92,23 +92,18 @@ jobs:
           MODE="${{ github.event.inputs.update_mode }}"
           if [ "$MODE" == "shorebird_patch" ]; then
             echo "Pushing Fast OTA Patch..."
-            shorebird patch android --force
+            shorebird patch android
           else
             echo "Building Full Shorebird Universal APK..."
             shorebird release android --artifact apk
-            echo "Building Full Shorebird Split APKs (64-bit & 32-bit)..."
-            shorebird release android --artifact apk -- --split-per-abi
           fi
 
-      - name: Upload All 3 Full Shorebird APKs
+      - name: Upload Shorebird Universal APK
         if: github.event.inputs.update_mode != 'shorebird_patch'
         uses: actions/upload-artifact@v4
         with:
-          name: School-Page-AI-Shorebird-Full-APKs
-          path: |
-            build/app/outputs/flutter-apk/app-release.apk
-            build/app/outputs/flutter-apk/app-arm64-v8a-release.apk
-            build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk
+          name: School-Page-AI-Shorebird-Universal-APK
+          path: build/app/outputs/flutter-apk/app-release.apk
 
   # =========================================================================
   # 3. CLASSIC FALLBACK SYSTEM (ALWAYS FULL 3-TYPE APKs + WINDOWS EXE)
