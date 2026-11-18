@@ -81,7 +81,7 @@ class _ChatScreenState extends State<ChatScreen> {
         onProgress: (progress) {
           if (mounted) {
             setState(() {
-              _downloadProgress = progress.fraction;
+              _downloadProgress = progress.fraction ?? 0.0;
             });
           }
         },
@@ -202,6 +202,63 @@ class _ChatScreenState extends State<ChatScreen> {
     }
   }
 
+  Widget _buildSuggestionCard({
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    required String prompt,
+  }) {
+    return InkWell(
+      onPressed: _session == null ? null : () => _sendMessage(prompt),
+      borderRadius: BorderRadius.circular(16),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: const Color(0xFF1E1F22),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: Colors.white12),
+        ),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: const Color(0xFF8AB4F8).withOpacity(0.15),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(icon, color: const Color(0xFF8AB4F8), size: 22),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 14.5,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 3),
+                  Text(
+                    subtitle,
+                    style: TextStyle(
+                      color: Colors.grey.shade400,
+                      fontSize: 12,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   void dispose() {
     _cancelToken?.cancel();
@@ -211,7 +268,8 @@ class _ChatScreenState extends State<ChatScreen> {
     _scrollController.dispose();
     super.dispose();
   }
-    @override
+
+  @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFF131314),
@@ -297,8 +355,7 @@ class _ChatScreenState extends State<ChatScreen> {
           });
         },
       ),
-
-            body: Column(
+      body: Column(
         children: [
           if (_session == null)
             Expanded(
@@ -455,7 +512,7 @@ class _ChatScreenState extends State<ChatScreen> {
                 ),
               ),
             )
-          else if (_messages.isEmpty)
+                    else if (_messages.isEmpty)
             Expanded(
               child: Center(
                 child: SingleChildScrollView(
@@ -524,7 +581,6 @@ class _ChatScreenState extends State<ChatScreen> {
                     MessageBubble(message: _messages[index]),
               ),
             ),
-
           SafeArea(
             child: Padding(
               padding: const EdgeInsets.fromLTRB(12, 6, 12, 10),
@@ -593,4 +649,6 @@ class _ChatScreenState extends State<ChatScreen> {
           ),
         ],
       ),
-      
+    );
+  }
+}
