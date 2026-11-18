@@ -1,0 +1,213 @@
+name: Build School Page AI (3-Architecture APK + Shorebird OTA)
+
+on:
+  push:
+    branches: ["main"]
+  workflow_dispatch:
+    inputs:
+      update_mode:
+        description: "Select Build / Update System"
+        required: true
+        default: "shorebird_patch"
+        type: choice
+        options:
+          - shorebird_patch      # 1. OTA Patch (ጥቂት KB ብቻ - ሙሉ APK ሳይወርድ አፑን ያድሳል)
+          - shorebird_release    # 2. Shorebird Base APK (Universal + 64-bit + 32-bit)
+          - classic_multi_apk    # 3. ክላሲክ 3 አይነት APK (32-bit, 64-bit, Universal) + Windows EXE
+
+permissions:
+  contents: write
+
+jobs:
+  # =========================================================================
+  # 1 & 2. SHOREBIRD SYSTEM (OTA PATCH & 3-TYPE RELEASE APKs)
+  # =========================================================================
+  shorebird-android:
+    name: Shorebird Build (${{ github.event.inputs.update_mode || 'shorebird_release' }})
+    if: github.event.inputs.update_mode != 'classic_multi_apk'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: zulu
+          java-version: "17"
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: "3.29.0"
+          cache: true
+
+      - name: Setup Shorebird
+        uses: shorebirdtech/setup-shorebird@v1
+        with:
+          cache: true
+
+      - name: Create Android Support Files
+        run: flutter create . --platforms=android
+
+      - name: Configure Android Permissions
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path("android/app/src/main/AndroidManifest.xml")
+          s = p.read_text()
+          perms = [
+              '<uses-permission android:name="android.permission.INTERNET"/>',
+              '<uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>'
+          ]
+          for perm in perms:
+              if perm not in s:
+                  pos = s.find("<application")
+                  s = s[:pos] + "    " + perm + "\n    " + s[pos:]
+          p.write_text(s)
+          PY
+
+      - name: Install Flutter Dependencies
+        run: flutter pub get
+
+      - name: Initialize Shorebird & Save Config
+        env:
+          SHOREBIRD_TOKEN: ${{ secrets.SHOREBIRD_TOKEN }}
+        run: |
+          if [ ! -f "shorebird.yaml" ]; then
+            shorebird init --force
+            git config --global user.name "GitHub Action"
+            git config --global user.email "action@github.com"
+            git add shorebird.yaml
+            git commit -m "chore: add shorebird.yaml [skip ci]"
+            git push
+          fi
+
+      - name: Execute Shorebird Release (3 APKs) or OTA Patch
+        env:
+          SHOREBIRD_TOKEN: ${{ secrets.SHOREBIRD_TOKEN }}
+        run: |
+          MODE="${{ github.event.inputs.update_mode }}"
+          if [ "$MODE" == "shorebird_release" ] || [ -z "$MODE" ]; then
+            echo "Building Shorebird Universal APK..."
+            shorebird release android --artifact apk
+            echo "Building Shorebird Split APKs (32-bit armv7 & 64-bit arm64)..."
+            shorebird release android --artifact apk -- --split-per-abi
+          else
+            echo "Pushing Fast OTA Patch (No Full APK Download Needed)..."
+            shorebird patch android --force
+          fi
+
+      - name: Upload 3 Types of Shorebird APKs
+        if: github.event.inputs.update_mode != 'shorebird_patch'
+        uses: actions/upload-artifact@v4
+        with:
+          name: School-Page-AI-Shorebird-3-APKs
+          path: |
+            build/app/outputs/flutter-apk/app-release.apk
+            build/app/outputs/flutter-apk/app-arm64-v8a-release.apk
+            build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk
+
+  # =========================================================================
+  # 3. CLASSIC FALLBACK SYSTEM (3-TYPE ANDROID APKs + WINDOWS EXE)
+  # =========================================================================
+  classic-android:
+    name: Classic 3-Architecture Android APKs
+    if: github.event.inputs.update_mode == 'classic_multi_apk'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: zulu
+          java-version: "17"
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: "3.29.0"
+          cache: true
+
+      - name: Create Android Support
+        run: flutter create . --platforms=android
+
+      - name: Enable Internet Permission
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path("android/app/src/main/AndroidManifest.xml")
+          s = p.read_text()
+          perms = [
+              '<uses-permission android:name="android.permission.INTERNET"/>',
+              '<uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>'
+          ]
+          for perm in perms:
+              if perm not in s:
+                  pos = s.find("<application")
+                  s = s[:pos] + "    " + perm + "\n    " + s[pos:]
+          p.write_text(s)
+          PY
+
+      - name: Install Dependencies
+        run: flutter pub get
+
+      - name: Build Universal APK (All Phones)
+        run: flutter build apk --release
+
+      - name: Build Split APKs (64-bit arm64 & 32-bit armv7)
+        run: flutter build apk --release --split-per-abi
+
+      - name: Upload Classic 3-Type APKs
+        uses: actions/upload-artifact@v4
+        with:
+          name: School-Page-AI-Classic-3-APKs
+          path: |
+            build/app/outputs/flutter-apk/app-release.apk
+            build/app/outputs/flutter-apk/app-arm64-v8a-release.apk
+            build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk
+
+  classic-windows:
+    name: Classic Windows EXE
+    if: github.event.inputs.update_mode == 'classic_multi_apk'
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: "3.29.0"
+          cache: true
+
+      - name: Create Windows Support
+        run: flutter create . --platforms=windows
+
+      - name: Install Dependencies
+        run: flutter pub get
+
+      - name: Build Windows Release
+        run: flutter build windows --release
+
+      - name: Package Windows App
+        shell: pwsh
+        run: |
+          Compress-Archive `
+            -Path "build/windows/x64/runner/Release/*" `
+            -DestinationPath "School-Page-AI-Windows.zip" `
+            -Force
+
+      - name: Upload Windows App
+        uses: actions/upload-artifact@v4
+        with:
+          name: School-Page-AI-Windows
+          path: School-Page-AI-Windows.zip
