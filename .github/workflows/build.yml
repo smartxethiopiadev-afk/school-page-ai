@@ -37,11 +37,11 @@ jobs:
           distribution: zulu
           java-version: "17"
 
-      - name: Setup Flutter (Dart >= 3.10.7 Compatible)
+      - name: Setup Flutter (Dart >= 3.6.0 Compatible)
         uses: subosito/flutter-action@v2
         with:
           channel: stable
-          flutter-version: "3.24.3"
+          flutter-version: "3.27.1"
           cache: true
 
       - name: Setup Shorebird
@@ -130,7 +130,7 @@ jobs:
         uses: subosito/flutter-action@v2
         with:
           channel: stable
-          flutter-version: "3.24.3"
+          flutter-version: "3.27.1"
           cache: true
 
       - name: Enable Internet Permission
@@ -182,7 +182,7 @@ jobs:
         uses: subosito/flutter-action@v2
         with:
           channel: stable
-          flutter-version: "3.24.3"
+          flutter-version: "3.27.1"
           cache: true
 
       - name: Install Dependencies
