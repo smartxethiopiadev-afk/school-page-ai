@@ -1,7 +1,7 @@
 name: school_page_ai
 description: "School Page AI - Offline AI Tutor for Ethiopian Grade 9-12 Students"
 publish_to: 'none'
-version: 1.0.0+4
+version: 1.0.0+6
 
 environment:
   sdk: '>=3.10.7 <4.0.0'
