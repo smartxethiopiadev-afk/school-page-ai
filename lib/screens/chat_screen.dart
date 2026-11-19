@@ -59,15 +59,15 @@ class _ChatScreenState extends State<ChatScreen> {
       await _initializeEngine();
     }
   }
-
   Future<void> _downloadAndLoadModel() async {
     if (_isDownloading || _isLoadingEngine) return;
 
     _cancelToken = ModelDownloadCancelToken();
     setState(() {
       _isDownloading = true;
+      _isLoadingEngine = false;
       _downloadProgress = 0.0;
-      _statusMessage = '${_selectedModel.name} በመውረድ ላይ ነው...';
+      _statusMessage = 'Step 1/2: ሞዴሉን በማውረድ ላይ (Downloading)...';
     });
 
     try {
@@ -80,8 +80,14 @@ class _ChatScreenState extends State<ChatScreen> {
         download: ModelLoadOptions(cancelToken: _cancelToken),
         onProgress: (progress) {
           if (mounted) {
+            final frac = progress.fraction ?? 0.0;
             setState(() {
-              _downloadProgress = progress.fraction ?? 0.0;
+              _downloadProgress = frac;
+              if (frac >= 0.999) {
+                _isDownloading = false;
+                _isLoadingEngine = true;
+                _statusMessage = 'Step 2/2: ወደ ስልኩ ሚሞሪ በመጫን ላይ (Loading into RAM)...';
+              }
             });
           }
         },
@@ -91,6 +97,7 @@ class _ChatScreenState extends State<ChatScreen> {
       if (mounted) {
         setState(() {
           _isDownloading = false;
+          _isLoadingEngine = false;
           _statusMessage = '';
         });
       }
@@ -98,13 +105,15 @@ class _ChatScreenState extends State<ChatScreen> {
       if (mounted) {
         setState(() {
           _isDownloading = false;
-          _statusMessage = 'ማውረድ አልተቻለም። ኢንተርኔትዎን ያረጋግጡ።';
+          _isLoadingEngine = false;
+          _statusMessage = 'ስህተት (Error): $e';
         });
       }
     }
   }
 
-  void _cancelDownload() {
+
+    void _cancelDownload() {
     _cancelToken?.cancel();
     setState(() {
       _isDownloading = false;
@@ -413,7 +422,17 @@ class _ChatScreenState extends State<ChatScreen> {
                           ),
                         ),
                         const SizedBox(height: 22),
-                        if (_isDownloading) ...[
+                                      if(_isDownloading) ...[
+                          Text(
+                            _statusMessage,
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(
+                              color: Color(0xFF8AB4F8),
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          const SizedBox(height: 12),
                           ClipRRect(
                             borderRadius: BorderRadius.circular(8),
                             child: LinearProgressIndicator(
@@ -454,9 +473,14 @@ class _ChatScreenState extends State<ChatScreen> {
                           const SizedBox(height: 14),
                           Text(
                             _statusMessage,
-                            style: const TextStyle(color: Colors.white70),
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(
+                              color: Color(0xFF8AB4F8),
+                              fontWeight: FontWeight.bold,
+                            ),
                           ),
                         ] else ...[
+
                           ElevatedButton.icon(
                             onPressed: _downloadAndLoadModel,
                             icon: const Icon(Icons.download_rounded, color: Colors.black),
